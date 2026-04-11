@@ -42,9 +42,9 @@ Welcome to AI at home, the minimally helpful, maximally efficient, and entertain
 
 		Docker support for production
 
-## To Do:
-	Properly templatize react components
-	Add a frontend framework to make things look prettier
-	Clean up code and documentation
-	Add build instructions to README
-	Make a better README :joy:
+To Do:
+	-Properly templatize react components
+	-Add a frontend framework to make things look prettier
+	-Clean up code and documentation
+	-Add build instructions to README
+	-Make a better README :joy:
