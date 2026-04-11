@@ -12,9 +12,11 @@ app.include_router(chat.router)
 
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=["*"],
+	# allow_origins=["*"],
+	allow_origins=["http://localhost:5173"],
 	allow_methods=["*"],
-	allow_headers=["*"]
+	allow_headers=["*"],
+	expose_headers=["X-Conversation-Id"]
 )
 
 # Debug

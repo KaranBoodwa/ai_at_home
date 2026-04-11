@@ -1,12 +1,27 @@
 import { useState, useRef, useEffect } from "react";
 
 export default function App(){
+	const [hovered, setHovered] = useState(null);
+	const [hasLoaded, setHasLoaded] = useState(false);
+	const [conversations, setConversations] = useState([]);
 	const [messages, setMessages] = useState([]);
 	const [input, setInput] = useState("");
 	const [page, setPage] = useState("Chat");
+	const [personality, setPersonality] = useState("default");
+	const [awaitingPersonality, setAwaitingPersonality] = useState(false);
+	const [pendingConversationId, setPendingConversationId] = useState(null);
+	const [conversationId, setConversationId] = useState(() =>{
+		const storedId = localStorage.getItem("conversationId");
+		return storedId ? parseInt(storedId) : null;
+	});
 
 	const chatBoxRef = useRef(null);
 	const chatEndRef = useRef(null);
+
+	const personalityNames = {
+		default:{ name: "Ape"},
+		sarcastic:{ name: "Clown"}
+	};
 
 	// Auto scrolling chat window function
 	const scrollToBottom = () => {
@@ -27,6 +42,93 @@ export default function App(){
 		}
 	},[messages]);
 
+
+	// Expose setters to browser console for debugging / fixing invalid states 
+	useEffect(() => {
+		window.__setConversationId = setConversationId;
+		window.__setMessages = setMessages;
+	}, []);
+
+	useEffect(() =>{
+		// Switch to just calling 'fetchConversations' in the future
+		const loadConversations = async () => {
+			try {
+				const response = await fetch("http://localhost:8000/conversations");
+				const response_data = await response.json();
+				setConversations(response_data);
+			}catch(error){
+				console.error("Failed to load past conversations.", error)
+			}
+		};
+		loadConversations();
+	}, []);
+
+	useEffect(() => {
+		if(!conversationId) return;
+		const loadMessages = async () => {
+			if(!conversationId || hasLoaded) return;
+
+			try{
+				// console.log(conversationId);
+				const response = await fetch(
+					`http://localhost:8000/messages/${conversationId}`
+				);
+				const response_data = await response.json();
+				setMessages(response_data);
+				setHasLoaded(true);
+			} catch(error){
+				console.error("Failed to load message history.", error)
+			}
+		};
+		loadMessages();
+	}, [conversationId]);
+
+	const fetchConversations = async () =>{
+		const response = await fetch("http://localhost:8000/conversations");
+		const response_data = await response.json();
+		setConversations(response_data);
+	}
+
+	const setActiveConversation = (id) => {
+		if (!id) return;
+		const parsedId = parseInt(id);
+		setConversationId(parsedId);
+		localStorage.setItem("conversationId", parsedId);
+	};
+
+	// Create new chat, cleanup
+	const newChat = () => {
+		setMessages([]);
+		setConversationId(null);
+		localStorage.removeItem("conversationId");
+		setPendingConversationId(null);
+		setAwaitingPersonality(true);
+	};
+
+	const handleSelectConversation = async(id) =>{
+		setActiveConversation(id);
+		localStorage.setItem("conversationId", id);
+
+		try{
+			const response = await fetch(`http://localhost:8000/messages/${id}`);
+			const response_data = await response.json();
+
+			setMessages(response_data);
+			const conv = conversations.find(c => c.id === id);
+			setPersonality(conv?.personality || "default");
+		}catch(error){
+			console.error("Failed to load messages for conversation <"+id+">.",error)
+		};
+
+	};
+
+	const selectPersonality = async(p) => {
+		setPersonality(p);
+		setAwaitingPersonality(false);
+		setPendingConversationId(null);
+
+	};
+
 	const sendMessage = async () => {
 		if (!input.trim()) return;
 
@@ -46,8 +148,24 @@ export default function App(){
 				headers: {
 					"Content-Type":"application/json"
 				},
-				body: JSON.stringify({ message: userText })
+				body: JSON.stringify({ 
+					message: userText,
+					conversation_id: conversationId,
+					personality: personality
+				})
 			});
+
+			const newConversationId = response.headers.get("X-Conversation-Id");
+
+			if (newConversationId && newConversationId!== "undefined"){
+				// console.log("raw id: ",newConversationId);
+				const parsedId = parseInt(newConversationId);
+				// console.log("parsed id: ", parsedId);
+				setActiveConversation(parsedId);
+				localStorage.setItem("conversationId", parsedId);
+				fetchConversations();
+			}
+
 
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
@@ -79,31 +197,102 @@ export default function App(){
 	return (
 		<div style={styles.page}>
 			{/* Navbar */}
-			<header style={styles.navbar}>
+			<div style={styles.navbar}>
 				<div style={styles.logo}>We have Al at home</div>
+				{/*<div style={styles.navLeft}>
+					<button onClick={newChat} style={styles.newChatButton}>
+						New Chat
+					</button>
+				</div>*/}
 
-				<div style={styles.navLinks}>
-					<button onClick={() => setPage("Chat")} style={styles.navlink}>
+				<div style={styles.navRight}>
+					<div 
+						onClick={() => setPage("Chat")} 
+						onMouseEnter={() => setHovered("Chat")}
+						onMouseLeave={() => setHovered("null")}
+						style={{
+							...styles.navLink,
+							...(page === "Chat" ? styles.activeNavLink : {} ),
+							...(hovered === "Chat" ? styles.navHover : {})
+						}}
+					>
 						Chat
-					</button>
-					<button onClick={() => setPage("About")} style={styles.navlink}>
+					</div>
+					<div 
+						onClick={() => setPage("About")} 
+						onMouseEnter={() => setHovered("About")}
+						onMouseLeave={() => setHovered("null")}
+						style={{
+							...styles.navLink,
+							...(page === "About" ? styles.activeNavLink : {} ),
+							...(hovered === "About" ? styles.navHover : {})
+						}}
+					>
 						About
-					</button>
-					<button onClick={() => setPage("Contact")} style={styles.navlink}>
+					</div>
+					<div 
+						onClick={() => setPage("Contact")} 
+						onMouseEnter={() => setHovered("Contact")}
+						onMouseLeave={() => setHovered("null")}
+						style={{
+							...styles.navLink,
+							...(page === "Contact" ? styles.activeNavLink : {} ),
+							...(hovered === "Contact" ? styles.navHover : {})
+						}}
+					>
 						Contact
-					</button>
+					</div>
 				</div>
-			</header>
+			</div>
 
 		{/*Chatbot Area*/}
 		<main style={styles.main}>
-			
+
 			{page === "Chat" && (
 			<>
-				<h2> We have Al at home </h2>
+				{/* Sidebar*/}
+				<div style={styles.sidebar}>
+					<button onClick={newChat} style={styles.newChatButton}>
+						New Chat
+					</button>
+
+					<div style={styles.conversationList}>
+						{conversations.map((conv) =>(
+							<div
+								key={conv.id}
+								style={{
+									...styles.conversationItem,
+									background:
+										conversationId === conv.id ? "#1e293b" : "transparent"
+								}}
+								onClick={() => handleSelectConversation(conv.id)}
+							>
+								Chat #{conv.id}
+							</div>
+
+						))}
+					</div>
+				</div>
+
 				{/* Messages */}
 				<div style={styles.chatOuter}>
+					<h2> We have Al at home </h2>
+					{ !awaitingPersonality &&( <h5> Chatting with {personality} aka {personalityNames[personality]?.name || "Clanker"} </h5>)}
 					<div style={styles.chatBox} ref={chatBoxRef}>
+						{awaitingPersonality &&(
+						<div style={styles.modal}>
+							<h3>Pick a clanker to chat to</h3>
+
+							<button style={styles.personalityButton} onClick={()=> selectPersonality("default")}>
+								Default (Ape)
+							</button>
+
+							<button style={styles.personalityButton} onClick={()=> selectPersonality("sarcastic")}>
+								Mocker
+							</button>
+						</div>
+						)}
+
 						{messages.map((msg,i) => (
 							<div
 								key={i}
@@ -120,6 +309,17 @@ export default function App(){
 					</div>
 
 					{/* Input */}
+
+					{/* Leaving in commented dropdown personality switcher for later testing*/}
+					{/*<select
+						value={personality}
+						onChange={(e) => setPersonality(e.target.value)}
+						style={{ marginRight: "10px", marginBottom: "20px"}}
+					>
+						<option value="default">Default</option>
+						<option value="sarcastic">Sarcastic</option>
+					</select>*/}
+
 					<div style={styles.inputRow}>
 						<input
 							style={styles.input}
@@ -141,7 +341,7 @@ export default function App(){
 
 
 			{page === "About" && (
-				<div style={{ padding: "10px" }}>
+				<div style={styles.content}>
 					<h2>About</h2>
 					<p>
 						This is a creative writing exercise masquerading as a coding side project.
@@ -153,10 +353,10 @@ export default function App(){
 			)}
 
 			{page === "Contact" && (
-				<div style={{ padding: "10px" }}>
+				<div style={styles.content}>
 					<h2>Contact Form</h2>
 					<p>
-						This may one day feature a contact form if I feel so generous
+						This may one day feature a contact form if I feel so generous.
 					</p>
 				</div>
 			)}
@@ -189,39 +389,107 @@ const styles = {
 		height: "60px",
 		display: "flex",
 		alignItems: "center",
+		justifyContent: "space-between",
 		padding: "0 20px",
 		borderBottom: "1px solid #222",
 		background: "#0a0a0a"
 	},
 
-	navLinks: {
-		marginLeft:"auto",
-		display:"flex",
-		gap:"12px"
+	navLeft: {
+		display: "flex",
+		alignItems: "center"
 	},
 
+	newChatButton: {
+		background: "#2563eb",
+		color: "white",
+		border: "none",
+		padding: "8px 14px",
+		borderRadius: "5px",
+		cursor: "pointer",
+		fontWeight: "500"
+	},
+
+	personalityButton: {
+		background: "green",
+		color: "white",
+		border: "none",
+		padding: "8px 14px",
+		borderRadius: "5px",
+		cursor: "pointer",
+		fontWeight: "500",
+		margin: "10px"
+	},
+	navRight:{
+		display:"flex",
+		gap: "15px",
+		alignItems: "center"
+	},
 	navLink: {
 		background: "transparent",
 		border: "1px solid #333",
-		color:"white",
-		padding:"6px 10px",
-		borderRadius:"6px",
+		color: "#cbd5f5",
+		padding:"5px 10px",
+		borderRadius:"5px",
 		cursor:"pointer",
-		fontSize:"15px"
+		fontSize:"16px",
+		transition: "all 0.2s ease",
+		fontWeight: "500",
+		letterSpacing: "0.3px"
+	},
+
+	navHover: {
+		backgroundColor: "#111827",
+		color:"#fff"
+	},
+
+	activeNavLink:{
+		color:"fff",
+		backgroundColor: "#1e293b"
 	},
 
 	logo:{
-		fontWeight:"bold",
-		fontSize: "16px"
+		padding: "10px 10px",
+		fontWeight: "bold",
+		fontSize: "24px"
 	},
 
 	main: {
 		flex: 1,
 		display: "flex",
-		flexDirection: "column",
-		padding: "20px",
 		overflow:"hidden",
 		minHeight: 0
+	},
+
+	sidebar: {
+		width: "250px",
+		borderRight: "1px solid #222",
+		padding: "10px",
+		display:"flex",
+		flexDirection: "column",
+		gap: "10px",
+		background: "#0a0a0a"
+	},
+
+	content: {
+		flex: 1,
+		display: "flex",
+		flexDirection: "column",
+		overflow: "hidden"
+	},
+
+	conversationList: {
+		display: "flex",
+		flexDirection: "column",
+		gap: "5px",
+		overflow:"auto"
+	},
+
+	conversationItem: {
+		padding: "10px",
+		borderRadius: "5px",
+		cursor:"pointer",
+		border: "1px solid #222"
 	},
 
 	footer: {
