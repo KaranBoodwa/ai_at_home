@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import Navbar from './Navbar';
 import About from './About';
 import Contact from './Contact';
+import './styles/app.css';
 
 export default function App(){
 	const [page, setPage] = useState("Chat");
@@ -28,7 +29,7 @@ export default function App(){
 
 	// Auto scrolling chat window function
 	const scrollToBottom = () => {
-		chatEndRef.current?.scrollIntoView({ behavior: "smooth"});
+		// chatEndRef.current?.scrollIntoView({ behavior: "smooth"});
 	};
 
 	const isNearBottom = () =>{
@@ -198,54 +199,52 @@ export default function App(){
 	};
 
 	return (
-		<div style={styles.page}>
+		<div className="w-full h-full bg-brand-900">
 			{/* Navbar */}
 			<Navbar page={page} setPage={setPage} />
 
-		{/*Chatbot Area*/}
-		<main style={styles.main}>
-
+			{/*Chatbot Area*/}
 			{page === "Chat" && (
 			<>
+			<main className="flex">
 				{/* Sidebar*/}
-				<div style={styles.sidebar}>
-					<button onClick={newChat} style={styles.newChatButton}>
+				<div className="flex flex-col w-1/4 items-center overflow-y-scroll h-210">
+					<button onClick={newChat} className="new_chat_btn mb-2 mt-1 w-8/9">
 						New Chat
 					</button>
 
-					<div style={styles.conversationList}>
-						{conversations.map((conv) =>(
-							<div
-								key={conv.id}
-								style={{
-									...styles.conversationItem,
-									background:
-										conversationId === conv.id ? "#1e293b" : "transparent"
-								}}
-								onClick={() => handleSelectConversation(conv.id)}
-							>
-								Chat #{conv.id}
-							</div>
+					{conversations.map((conv) =>(
+						<div
+							key={conv.id}
+							className={"border-1 cursor-pointer text-white basic_btn m-1 w-8/9" + (conversationId === conv.id ? " bg-brand-600" : " bg-brand-900")}
+							onClick={() => handleSelectConversation(conv.id)}
+						>
+							Chat #{conv.id}
+						</div>
 
-						))}
-					</div>
+					))}
+
 				</div>
 
 				{/* Messages */}
-				<div style={styles.chatOuter}>
-					{ !awaitingPersonality &&( <h5> Chatting with {personalityNames[personality]?.name || "Clanker"} </h5>)}
-					<div style={styles.chatBox} ref={chatBoxRef}>
+				<div className="flex flex-col w-3/4 m-10">
+					{ !awaitingPersonality &&( 
+						<><h5 className="text-white m-2 text-2xl"> Chatting with {personalityNames[personality]?.name || "Clanker"} </h5>
+						<hr className="mb-5"/></>
+					)}
+					
+					<div className="flex flex-col gap-10px mb-10px py-5px overflow-auto" ref={chatBoxRef}>
 						{awaitingPersonality &&(
 						<div style={styles.modal}>
 
 							{/* To do: pull list of personalities and loop through*/}
 
 							<h3>Pick a clanker to chat to</h3>
-							<button style={styles.personalityButton} onClick={()=> selectPersonality("default")}>
+							<button className="basic_btn m-3" onClick={()=> selectPersonality("default")}>
 								Ape
 							</button>
 
-							<button style={styles.personalityButton} onClick={()=> selectPersonality("sarcastic")}>
+							<button className="basic_btn m-3" onClick={()=> selectPersonality("sarcastic")}>
 								Clown
 							</button>
 						</div>
@@ -253,11 +252,11 @@ export default function App(){
 
 						{messages.map((msg,i) => (
 							<div
+								className="text-white p-3 rounded-md max-w-70"
 								key={i}
 								style={{
-									...styles.message,
 									alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-									background: msg.role === "user" ? "#2563eb" : "#333"
+									background: msg.role === "user" ? "#48356c" : "#333"
 								}}
 							>
 								{msg.content}
@@ -278,22 +277,23 @@ export default function App(){
 						<option value="sarcastic">Sarcastic</option>
 					</select>*/}
 
-					<div style={styles.inputRow}>
+					<div className="flex gap-10px mt-10">
 						<input
-							style={styles.input}
+							className="flex w-full border-1 h-full p-1 rounded-md"
 							value={input}
 							onChange={(e) => setInput(e.target.value)}
 							placeholder="Type a message..."
 							onKeyDown={(e) => e.key === "Enter" && sendMessage()}
 						/>
 						<button 
-							style={styles.button}
+							className="basic_btn"
 							onClick={sendMessage}
 						>
 							Send
 						</button>
 					</div>
 				</div>
+			</main>
 			</>
 			)}
 
@@ -306,141 +306,10 @@ export default function App(){
 				<Contact />
 			)}
 
-
-		</main>
-
-		{/* Footer */}
-		<footer style={styles.footer}>
-			© 2026 Karan Boodwa-Ko
-		</footer>
-	</div>
+			{/* Footer */}
+			<footer className="w-full h-15 flex justify-center border-t-1 items-center text-sm mt-1 p-2">
+				© 2026 Karan Boodwa-Ko
+			</footer>
+		</div>
 	);
-}
-
-// Styles
-const styles = {
-	page: {
-		height: "100vh",
-		width: "100%",
-		display: "flex",
-		flexDirection: "column",
-		background: "#111",
-		color: "white",
-		overflow:"hidden"
-	},
-
-	newChatButton: {
-		background: "#2563eb",
-		color: "white",
-		border: "none",
-		padding: "8px 14px",
-		borderRadius: "5px",
-		cursor: "pointer",
-		fontWeight: "500"
-	},
-
-	personalityButton: {
-		background: "green",
-		color: "white",
-		border: "none",
-		padding: "8px 14px",
-		borderRadius: "5px",
-		cursor: "pointer",
-		fontWeight: "500",
-		margin: "10px"
-	},
-
-	main: {
-		flex: 1,
-		display: "flex",
-		overflow:"hidden",
-		minHeight: 0
-	},
-
-	sidebar: {
-		width: "250px",
-		borderRight: "1px solid #222",
-		padding: "10px",
-		display:"flex",
-		flexDirection: "column",
-		gap: "10px",
-		background: "#0a0a0a"
-	},
-
-	conversationList: {
-		display: "flex",
-		flexDirection: "column",
-		gap: "5px",
-		overflow:"auto"
-	},
-
-	conversationItem: {
-		padding: "10px",
-		borderRadius: "5px",
-		cursor:"pointer",
-		border: "1px solid #222"
-	},
-
-	footer: {
-		width: "100%",
-		height: "40px",
-		flexShrink: 0,
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "center",
-		borderTop: "3px solid #222",
-		marginTop: "auto",
-		fontSize: "12px",
-		color: "#888",
-		background: "0a0a0a"
-	},
-
-	chatOuter:{
-		flex: 1,
-		display: "flex",
-		flexDirection: "column",
-		maxWidth: "800px",
-		width:"100%",
-		minHeight: 0,
-		margin: "0 auto",
-		padding: "0 16px"
-	},
-
-	chatBox: {
-		flex: 1,
-		display: "flex",
-		flexDirection: "column",
-		gap: "10px",
-		overflowY: "auto",
-		marginBottom: "10px",
-		paddingRight: "5px",
-		minHeight: 0
-	},
-
-	message: {
-		padding: "10px 14px",
-		borderRadius: "15px",
-		maxWidth: "60%"
-	},
-
-	inputRow: {
-		display: "flex",
-		gap: "10px"
-	},
-
-	input: {
-		flex: 1,
-		padding: "10px",
-		borderRadius: "10px",
-		border: "none"
-	},
-
-	button: {
-		padding: "10px 15px",
-		borderRadius: "10px",
-		border: "none",
-		background: "#2563eb",
-		color: "white",
-		cursor: "pointer"
-	}
 }

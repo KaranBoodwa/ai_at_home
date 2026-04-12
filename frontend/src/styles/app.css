@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+	--color-brand: #5a4287;
+	--color-brand-50: #efecf3;
+	--color-brand-100: #ded9e7;
+	--color-brand-200: #bdb3cf;
+	--color-brand-300: #9c8eb7;
+	--color-brand-400: #7b689f;
+	--color-brand-500: #5a4287;
+	--color-brand-600: #48356c;
+	--color-brand-700: #362851;
+	--color-brand-800: #241a36;
+	--color-brand-900: #120d1b;
+}
+
+
+@layer components{
+	.new_chat_btn{
+		@apply cursor-pointer bg-brand-500 hover:bg-brand-400 text-white font-bold py-2 px-4 border-b-4 border-brand-700 hover:border-brand-500 rounded
+	}
+
+	.basic_btn{
+		@apply cursor-pointer bg-brand-500 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded
+	}
+
+}
