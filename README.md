@@ -15,6 +15,7 @@ Welcome to AI at home, the minimally helpful, maximally efficient, and entertain
 
 ## Technology Stack:
 	Vite + React
+		Tailwindcss
 	Python
 		FastAPI
 		uvicorn

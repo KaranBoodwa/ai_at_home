@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect } from "react";
+import Navbar from './Navbar';
+import About from './About';
+import Contact from './Contact';
 
 export default function App(){
+	const [page, setPage] = useState("Chat");
 	const [hovered, setHovered] = useState(null);
 	const [hasLoaded, setHasLoaded] = useState(false);
 	const [conversations, setConversations] = useState([]);
 	const [messages, setMessages] = useState([]);
 	const [input, setInput] = useState("");
-	const [page, setPage] = useState("Chat");
 	const [personality, setPersonality] = useState("default");
 	const [awaitingPersonality, setAwaitingPersonality] = useState(false);
 	const [pendingConversationId, setPendingConversationId] = useState(null);
@@ -197,53 +200,7 @@ export default function App(){
 	return (
 		<div style={styles.page}>
 			{/* Navbar */}
-			<div style={styles.navbar}>
-				<div style={styles.logo}>We have Al at home</div>
-				{/*<div style={styles.navLeft}>
-					<button onClick={newChat} style={styles.newChatButton}>
-						New Chat
-					</button>
-				</div>*/}
-
-				<div style={styles.navRight}>
-					<div 
-						onClick={() => setPage("Chat")} 
-						onMouseEnter={() => setHovered("Chat")}
-						onMouseLeave={() => setHovered("null")}
-						style={{
-							...styles.navLink,
-							...(page === "Chat" ? styles.activeNavLink : {} ),
-							...(hovered === "Chat" ? styles.navHover : {})
-						}}
-					>
-						Chat
-					</div>
-					<div 
-						onClick={() => setPage("About")} 
-						onMouseEnter={() => setHovered("About")}
-						onMouseLeave={() => setHovered("null")}
-						style={{
-							...styles.navLink,
-							...(page === "About" ? styles.activeNavLink : {} ),
-							...(hovered === "About" ? styles.navHover : {})
-						}}
-					>
-						About
-					</div>
-					<div 
-						onClick={() => setPage("Contact")} 
-						onMouseEnter={() => setHovered("Contact")}
-						onMouseLeave={() => setHovered("null")}
-						style={{
-							...styles.navLink,
-							...(page === "Contact" ? styles.activeNavLink : {} ),
-							...(hovered === "Contact" ? styles.navHover : {})
-						}}
-					>
-						Contact
-					</div>
-				</div>
-			</div>
+			<Navbar page={page} setPage={setPage} />
 
 		{/*Chatbot Area*/}
 		<main style={styles.main}>
@@ -276,19 +233,20 @@ export default function App(){
 
 				{/* Messages */}
 				<div style={styles.chatOuter}>
-					<h2> We have Al at home </h2>
-					{ !awaitingPersonality &&( <h5> Chatting with {personality} aka {personalityNames[personality]?.name || "Clanker"} </h5>)}
+					{ !awaitingPersonality &&( <h5> Chatting with {personalityNames[personality]?.name || "Clanker"} </h5>)}
 					<div style={styles.chatBox} ref={chatBoxRef}>
 						{awaitingPersonality &&(
 						<div style={styles.modal}>
-							<h3>Pick a clanker to chat to</h3>
 
+							{/* To do: pull list of personalities and loop through*/}
+
+							<h3>Pick a clanker to chat to</h3>
 							<button style={styles.personalityButton} onClick={()=> selectPersonality("default")}>
-								Default (Ape)
+								Ape
 							</button>
 
 							<button style={styles.personalityButton} onClick={()=> selectPersonality("sarcastic")}>
-								Mocker
+								Clown
 							</button>
 						</div>
 						)}
@@ -341,24 +299,11 @@ export default function App(){
 
 
 			{page === "About" && (
-				<div style={styles.content}>
-					<h2>About</h2>
-					<p>
-						This is a creative writing exercise masquerading as a coding side project.
-						If this was somehow useful or helpful for you, I apologize. Our engineers are working tirelessly to correct this to ensure it never happens again.
-
-						This will eventually feature a suite of different personalities to chat with (maybe, idk, if I don't get bored I guess)
-					</p>
-				</div>
+				<About />
 			)}
 
 			{page === "Contact" && (
-				<div style={styles.content}>
-					<h2>Contact Form</h2>
-					<p>
-						This may one day feature a contact form if I feel so generous.
-					</p>
-				</div>
+				<Contact />
 			)}
 
 
@@ -384,22 +329,6 @@ const styles = {
 		overflow:"hidden"
 	},
 
-	navbar: {
-		width: "100%",
-		height: "60px",
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: "0 20px",
-		borderBottom: "1px solid #222",
-		background: "#0a0a0a"
-	},
-
-	navLeft: {
-		display: "flex",
-		alignItems: "center"
-	},
-
 	newChatButton: {
 		background: "#2563eb",
 		color: "white",
@@ -420,39 +349,6 @@ const styles = {
 		fontWeight: "500",
 		margin: "10px"
 	},
-	navRight:{
-		display:"flex",
-		gap: "15px",
-		alignItems: "center"
-	},
-	navLink: {
-		background: "transparent",
-		border: "1px solid #333",
-		color: "#cbd5f5",
-		padding:"5px 10px",
-		borderRadius:"5px",
-		cursor:"pointer",
-		fontSize:"16px",
-		transition: "all 0.2s ease",
-		fontWeight: "500",
-		letterSpacing: "0.3px"
-	},
-
-	navHover: {
-		backgroundColor: "#111827",
-		color:"#fff"
-	},
-
-	activeNavLink:{
-		color:"fff",
-		backgroundColor: "#1e293b"
-	},
-
-	logo:{
-		padding: "10px 10px",
-		fontWeight: "bold",
-		fontSize: "24px"
-	},
 
 	main: {
 		flex: 1,
@@ -469,13 +365,6 @@ const styles = {
 		flexDirection: "column",
 		gap: "10px",
 		background: "#0a0a0a"
-	},
-
-	content: {
-		flex: 1,
-		display: "flex",
-		flexDirection: "column",
-		overflow: "hidden"
 	},
 
 	conversationList: {
