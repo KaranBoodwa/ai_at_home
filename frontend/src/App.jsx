@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Navbar from './Navbar';
+import Footer from './Footer';
 import About from './About';
 import Contact from './Contact';
 import './styles/app.css';
@@ -208,7 +209,7 @@ export default function App(){
 			<>
 			<main className="flex">
 				{/* Sidebar*/}
-				<div className="flex flex-col w-1/4 items-center overflow-y-scroll h-210">
+				<div className="flex flex-col w-1/4 items-center overflow-y-scroll h-180">
 					<button onClick={newChat} className="new_chat_btn mb-2 mt-1 w-8/9">
 						New Chat
 					</button>
@@ -235,7 +236,7 @@ export default function App(){
 					
 					<div className="flex flex-col gap-10px mb-10px py-5px overflow-auto" ref={chatBoxRef}>
 						{awaitingPersonality &&(
-						<div style={styles.modal}>
+						<div>
 
 							{/* To do: pull list of personalities and loop through*/}
 
@@ -307,9 +308,7 @@ export default function App(){
 			)}
 
 			{/* Footer */}
-			<footer className="w-full h-15 flex justify-center border-t-1 items-center text-sm mt-1 p-2">
-				© 2026 Karan Boodwa-Ko
-			</footer>
+			<Footer /> 
 		</div>
 	);
 }

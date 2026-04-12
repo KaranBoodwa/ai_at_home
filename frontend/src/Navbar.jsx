@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState } from "react";
-import './styles/navbar.css';
+import './styles/app.css';
 
 // Responsive Navbar
 function Navbar({ page, setPage }){
