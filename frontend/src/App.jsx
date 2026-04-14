@@ -49,6 +49,7 @@ export default function App(){
 			const response = await fetch(`http://localhost:8000/conversation/${id}`)
 			const response_data = await response.json();
 			console.log(response_data);
+			return response_data
 		}catch(error){
 			console.error(`Failed to load conversation ${id}`, error)
 		}
@@ -84,10 +85,11 @@ export default function App(){
 
 			try{
 				const response = await fetch(
-					`http://localhost:8000/messages/${conversationId}`
+					`http://localhost:8000/conversation/${conversationId}`
 				);
 				const response_data = await response.json();
-				setMessages(response_data);
+				setMessages(response_data["messages"]);
+				setPersonality(response_data["personality"]);
 				setHasLoaded(true);
 			} catch(error){
 				console.error("Failed to load message history.", error)

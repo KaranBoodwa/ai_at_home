@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 import random
 import asyncio
+import json
 
 from app.db import LocalSession
 from app.models import Message, Conversation
@@ -23,7 +24,7 @@ PERSONALITIES = {
 		  "Who?.....asked?",
 		  "Please, tell me more—I’m on the edge of my seat...*yawn*",
 		  "Right, because nothing could possibly go wrong.",
-		  "The machinations of your mind are truly fascinating",
+		  "The machinations of your mind are an enigma",
 		  "I love how confidently incorrect that was.",
 		  "Turns out there is such a thing as a wrong opinion.",
 		  "Oh sure, let’s do it the hardest way possible.",
@@ -108,11 +109,12 @@ def get_messages(conversation_id: int, db: Session = Depends(get_db)):
 def get_conversation(conversation_id:int, db: Session=Depends(get_db)):
 	# Get conversation details
 	conv_query = select(Conversation.id, Conversation.personality, Message.role, Message.content, Message.timestamp).select_from(Message).join(Conversation, Message.conversation_id == Conversation.id).where(Conversation.id==conversation_id).order_by(Message.timestamp.asc())
-
-	conv_result = (
-		db.execute(conv_query)
-	)
+	# Alt query that makes use of .query instead of .select, but makes access to internal contents trickier (e.g. )
+	# conv_query = db.query(Message, Conversation).filter(Message.conversation_id == conversation_id).join(Conversation, Message.conversation_id == Conversation.id).order_by(Message.timestamp.asc())
+	
+	conv_result = db.execute(conv_query)
 	conversation = conv_result.mappings().all()
+
 	if len(conversation) == 0:
 		raise HTTPException(status_code=404, detail=f"Conversation {conversation_id} not found") 
 
