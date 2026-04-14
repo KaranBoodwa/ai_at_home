@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Form, Depends
+from fastapi import APIRouter, Form, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from app.services.bot import stream_mirror
 from sqlalchemy.orm import Session
+from sqlalchemy import select
+import random
 import asyncio
 
 from app.db import LocalSession
@@ -12,16 +14,31 @@ from app.models import Message, Conversation
 # Load from DB later
 PERSONALITIES = {
 	"default":{
-		"prefix":""
+		"responses":[""]
 	},
 	"sarcastic":{
-		"prefix":"Duh, of course "
+		"responses":[
+		  "Oh wow, what a brilliant statement. Somtimes things have never been said before for a reason.",
+		  "Yeah, because that’s definitely how things work.",
+		  "Who?.....asked?",
+		  "Please, tell me more—I’m on the edge of my seat...*yawn*",
+		  "Right, because nothing could possibly go wrong.",
+		  "The machinations of your mind are truly fascinating",
+		  "I love how confidently incorrect that was.",
+		  "Turns out there is such a thing as a wrong opinion.",
+		  "Oh sure, let’s do it the hardest way possible.",
+		  "Because that worked so well last time.",
+		  "I've run out of basic responses, please deposit $5.99 to continue chatting"
+		]
 	}
 }
 
+# Switch to a more complete 'response generation' later
 def apply_personality(text:str, personality: str):
-	config = PERSONALITIES.get(personality, PERSONALITIES["default"])
-	return config["prefix"] + text
+	personality_cfg = PERSONALITIES.get(personality, PERSONALITIES["default"])
+	responses = personality_cfg["responses"]
+	response = random.choice(responses)
+	return text if response=="" else response
 
 router = APIRouter()
 
@@ -73,13 +90,12 @@ async def chat(req:ChatRequest, db: Session = Depends(get_db)):
 	# return req.message
 
 
-
 @router.get("/messages/{conversation_id}")
 def get_messages(conversation_id: int, db: Session = Depends(get_db)):
 	messages = (
 		db.query(Message).filter(Message.conversation_id == conversation_id).order_by(Message.timestamp.asc()).all()
 	)
-	print(f"{messages=}")
+
 	return[
 		{
 			"role": m.role,
@@ -88,6 +104,32 @@ def get_messages(conversation_id: int, db: Session = Depends(get_db)):
 		for m in messages
 	]
 
+@router.get("/conversation/{conversation_id}")
+def get_conversation(conversation_id:int, db: Session=Depends(get_db)):
+	# Get conversation details
+	conv_query = select(Conversation.id, Conversation.personality, Message.role, Message.content, Message.timestamp).select_from(Message).join(Conversation, Message.conversation_id == Conversation.id).where(Conversation.id==conversation_id).order_by(Message.timestamp.asc())
+
+	conv_result = (
+		db.execute(conv_query)
+	)
+	conversation = conv_result.mappings().all()
+	if len(conversation) == 0:
+		raise HTTPException(status_code=404, detail=f"Conversation {conversation_id} not found") 
+
+	messages = [
+		{
+			"role":m.role,
+			"content":m.content
+		}
+		for m in conversation
+	]
+
+	response = {
+		"id":conversation[0].id,
+		"personality":conversation[0].personality,
+		"messages":messages
+	}
+	return response
 
 
 @router.get("/conversations")

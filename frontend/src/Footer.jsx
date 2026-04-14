@@ -4,9 +4,11 @@ import React from 'react';
 function Footer(){
 	return(
 		<>
-			<div className="w-full h-15 flex justify-center border-t-1 items-center text-sm mt-1 p-2">
-				© 2026 Karan Boodwa-Ko
-			</div>
+			<footer className="w-full h-1/24 bottom-0 fixed flex justify-center items-center border-t-1 border-t-purp-300 bg-gray-300">
+				<p className="text-gray-800 text-sm">
+					© 2026 Karan Boodwa-Ko
+				</p>
+			</footer>
 		</>
 	);
 }
