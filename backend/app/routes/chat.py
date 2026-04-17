@@ -1,18 +1,19 @@
+from contextlib import asynccontextmanager
 from fastapi import APIRouter, Form, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from app.services.bot import stream_mirror
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 import random
 import asyncio
 import json
 
 from app.db import LocalSession
 from app.models import Message, Conversation
+from app.Bots.PersonalityCore import PersonalityCore
 
-# Load from DB later
 PERSONALITIES = {
 	"default":{
 		"responses":[""]
@@ -34,6 +35,17 @@ PERSONALITIES = {
 	}
 }
 
+
+router = APIRouter()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	print("We don't need to pay for Claude, we have AI At Home...")
+
+	yield
+	print("See? Wasn't that So much better?")
+
 # Switch to a more complete 'response generation' later
 def apply_personality(text:str, personality: str):
 	personality_cfg = PERSONALITIES.get(personality, PERSONALITIES["default"])
@@ -41,7 +53,6 @@ def apply_personality(text:str, personality: str):
 	response = random.choice(responses)
 	return text if response=="" else response
 
-router = APIRouter()
 
 def get_db():
 	db=LocalSession()
@@ -62,14 +73,13 @@ async def chat(req:ChatRequest, db: Session = Depends(get_db)):
 	conversation_id = req.conversation_id
 
 	# New conversation, add to db
+	# DB Operations should eventually be moved to a separate db ops handler
 	if not conversation_id:
 		conversation = Conversation(personality=req.personality or "default")
 		db.add(conversation)
 		db.commit()
 		db.refresh(conversation)
 		conversation_id = conversation.id
-
-	print(f"{conversation_id=}")
 
 	user_msg = Message(role="user", content=message, conversation_id=conversation_id)
 
@@ -86,24 +96,8 @@ async def chat(req:ChatRequest, db: Session = Depends(get_db)):
 		db.add(bot_msg)
 		db.commit()
 
-	print(str(conversation_id))
 	return StreamingResponse(stream_response(), media_type="text/plain",headers={"X-Conversation-Id": str(conversation_id)})
-	# return req.message
 
-
-@router.get("/messages/{conversation_id}")
-def get_messages(conversation_id: int, db: Session = Depends(get_db)):
-	messages = (
-		db.query(Message).filter(Message.conversation_id == conversation_id).order_by(Message.timestamp.asc()).all()
-	)
-
-	return[
-		{
-			"role": m.role,
-			"content": m.content
-		} 
-		for m in messages
-	]
 
 @router.get("/conversation/{conversation_id}")
 def get_conversation(conversation_id:int, db: Session=Depends(get_db)):
@@ -147,13 +141,72 @@ def get_conversations(db: Session = Depends(get_db)):
 		for c in conversations
 	]
 
-@router.patch("/conversations/{conversation_id}/personality")
-def update_personality(conversation_id: int, personality:str, db: Session = Depends(get_db) ):
-	conversation_fetch = db.query(Conversation).filter(Conversation.id == conversation_id).first()
 
-	if not conversation_fetch:
-		raise HTTPException(status_code=404, detail=f"Conversation {conversation_id} not found")
 
-	conversation_fetch.personality = personality
+
+@router.post("/newchat")
+async def newChat(req:ChatRequest, db: Session = Depends(get_db)):
+	# Need to switch to instantiating personality core on launch vs on every chat call
+	personalityCore = PersonalityCore()
+
+	# By default, set state to 'default', if conversation exists, we fetch state
+	state = "default"
+
+	# If a blank message is sent in request, return a 400 (bad request) 
+	if not req.message:
+		raise HTTPException(status_code=400, detail=f"Blank message not allowed")
+
+	# New conversation, push conversation to db
+	if not req.conversation_id:
+		conversation = Conversation(personality=req.personality or "default")
+		db.add(conversation)
+		db.commit()
+		db.refresh(conversation)
+		req.conversation_id = conversation.id
+	# Not a new conversation, fetch conversation state
+	else:
+		stmt = select(Conversation.state).select_from(Conversation).where(Conversation.id==req.conversation_id)
+		state_select = db.execute(stmt).one_or_none()
+		if state_select:
+			state = state_select[0]
+		print(f"state after select: {state}")
+
+
+	# Push user message to db
+	user_msg = Message(role="user", content=req.message, conversation_id=req.conversation_id)
+	db.add(user_msg)
 	db.commit()
-	return {"id": conversation_fetch.id, "personality":conversation_fetch.personality}
+
+	async def stream_response():
+		# Generate bot response based on: message, personality, and state
+		new_state, response = personalityCore.respond(req.personality, state, req.message)
+		print(response)
+
+		for char in response:
+			yield char
+			# Simulate typing response
+			await asyncio.sleep(0.03)
+
+		# Push bot message to db
+		bot_msg = Message(role="bot",content=response,conversation_id=req.conversation_id)
+		db.add(bot_msg)
+		db.commit()
+
+		# Update conversation state to new state
+		update_conversation_state(req.conversation_id, new_state, db)
+
+	return StreamingResponse(stream_response(), media_type="text/plain",headers={"X-Conversation-Id": str(req.conversation_id)})
+
+
+
+
+def update_conversation_state(conversation_id, new_state, db: Session = Depends(get_db)):
+	# update state column of db row where conversation_id matches param
+	stmt = (
+			update(Conversation)
+			.where(Conversation.id == conversation_id)
+			.values(state = new_state)
+	)
+
+	db.execute(stmt)
+	db.commit()

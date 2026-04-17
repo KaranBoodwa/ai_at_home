@@ -93,19 +93,20 @@ export default function App(){
 				if(!response.ok){
 					console.error(`Failed to load message history for ${conversationId}.`)
 					localStorage.removeItem("conversationId");
-					conversationId = null;
-					awaitingPersonality = true;
+					setConversationId(null);
+					setAwaitingPersonality(true);
 				}
 
 				const response_data = await response.json();
 				setMessages(response_data["messages"]);
 				setPersonality(response_data["personality"]);
 				setHasLoaded(true);
+				setAwaitingPersonality(false);
 			} catch(error){
 				console.error(`Failed to load message history for ${conversationId}.`, error)
 				localStorage.removeItem("conversationId");
-				conversationId = null;
-				awaitingPersonality = true;
+				setConversationId(null);
+				setAwaitingPersonality(true);
 			}
 		};
 
@@ -143,8 +144,8 @@ export default function App(){
 			if(!response.ok){
 				console.error(`Failed to load message history for ${conversationId}.`)
 				localStorage.removeItem("conversationId");
-				conversationId = null;
-				awaitingPersonality = true;
+				setConversationId(null);
+				setAwaitingPersonality(true);
 			}
 
 			const response_data = await response.json();
@@ -180,7 +181,7 @@ export default function App(){
 		setInput("");
 
 		try {
-			const response = await fetch("http://localhost:8000/chat",{
+			const response = await fetch("http://localhost:8000/newchat",{
 				method: "POST",
 				headers: {
 					"Content-Type":"application/json"

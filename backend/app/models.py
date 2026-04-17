@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .db import Base
@@ -20,4 +20,6 @@ class Conversation(Base):
 	id = Column(Integer, primary_key=True, index=True)
 	created = Column(DateTime, default=datetime.utcnow)
 	personality = Column(String, default="default")
+	state = Column(String, default="default")
+	active = Column(Boolean, default=True)
 	messages=relationship("Message", back_populates="conversation")
