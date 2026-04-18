@@ -11,7 +11,8 @@ export default function App(){
 	const [hasLoaded, setHasLoaded] = useState(false);
 	const [conversations, setConversations] = useState([]);
 	const [messages, setMessages] = useState([]);
-	const [input, setInput] = useState("");
+	const [personalityNames, setPersonalityNames] = useState({});
+	const [input, setInput] = useState(""); // User Input
 	const [personality, setPersonality] = useState("default");
 	const [awaitingPersonality, setAwaitingPersonality] = useState(true);
 	const [pendingConversationId, setPendingConversationId] = useState(null);
@@ -21,13 +22,11 @@ export default function App(){
 		return storedId ? parseInt(storedId) : null;
 	});
 
+	const serverUrl = "http://localhost:8000";
 	const chatBoxRef = useRef(null);
 	const chatEndRef = useRef(null);
 
-	const personalityNames = {
-		default:{ name: "Ape"},
-		sarcastic:{ name: "Clown"}
-	};
+
 
 	// Auto scrolling chat window function
 	const scrollToBottom = () => {
@@ -46,7 +45,7 @@ export default function App(){
 
 	const getConversation = async(id) =>{
 		try{
-			const response = await fetch(`http://localhost:8000/conversation/${id}`)
+			const response = await fetch(`${serverUrl}/conversation/${id}`)
 			if(!response.ok){
 				return null;
 			}
@@ -64,20 +63,12 @@ export default function App(){
 		window.__setConversationId = setConversationId;
 		window.__setMessages = setMessages;
 		window.getConversation = getConversation;
+		window.reset = newChat;
 	}, []);
 
 	useEffect(() =>{
-		// Switch to just calling 'fetchConversations' in the future
-		const loadConversations = async () => {
-			try {
-				const response = await fetch("http://localhost:8000/conversations");
-				const response_data = await response.json();
-				setConversations(response_data);
-			}catch(error){
-				console.error("Failed to load past conversations.", error)
-			}
-		};
-		loadConversations();
+		fetchPersonalities();
+		fetchConversations();
 	}, []);
 
 	useEffect(() => {
@@ -88,24 +79,25 @@ export default function App(){
 
 			try{
 				const response = await fetch(
-					`http://localhost:8000/conversation/${conversationId}`
+					`${serverUrl}/conversation/${conversationId}`
 				);
 				if(!response.ok){
 					console.error(`Failed to load message history for ${conversationId}.`)
 					localStorage.removeItem("conversationId");
-					conversationId = null;
-					awaitingPersonality = true;
+					setConversationId(null);
+					setAwaitingPersonality(true);
 				}
 
 				const response_data = await response.json();
 				setMessages(response_data["messages"]);
 				setPersonality(response_data["personality"]);
 				setHasLoaded(true);
+				setAwaitingPersonality(false);
 			} catch(error){
 				console.error(`Failed to load message history for ${conversationId}.`, error)
 				localStorage.removeItem("conversationId");
-				conversationId = null;
-				awaitingPersonality = true;
+				setConversationId(null);
+				setAwaitingPersonality(true);
 			}
 		};
 
@@ -113,10 +105,25 @@ export default function App(){
 	}, [conversationId]);
 
 	const fetchConversations = async () =>{
-		const response = await fetch("http://localhost:8000/conversations");
-		const response_data = await response.json();
-		setConversations(response_data);
-	}
+		try {
+			const response = await fetch(`${serverUrl}/history`);
+			const response_data = await response.json();
+			setConversations(response_data);
+		}catch(error){
+			console.error("Failed to load past conversations.", error)
+		}
+	};
+
+	const fetchPersonalities = async () =>{
+		try{
+			const response = await fetch(`${serverUrl}/bots`);
+			const response_data = await response.json()
+			setPersonalityNames(response_data);
+
+		}catch(error){
+			console.error("Failed to load Personality names", error)
+		}
+	};
 
 	const setActiveConversation = (id) => {
 		if (!id) return;
@@ -127,9 +134,9 @@ export default function App(){
 
 	// Create new chat, cleanup
 	const newChat = () => {
+		localStorage.removeItem("conversationId");
 		setMessages([]);
 		setConversationId(null);
-		localStorage.removeItem("conversationId");
 		setPendingConversationId(null);
 		setAwaitingPersonality(true);
 	};
@@ -139,12 +146,12 @@ export default function App(){
 		localStorage.setItem("conversationId", id);
 
 		try{
-			const response = await fetch(`http://localhost:8000/conversation/${id}`);
+			const response = await fetch(`${serverUrl}/conversation/${id}`);
 			if(!response.ok){
 				console.error(`Failed to load message history for ${conversationId}.`)
 				localStorage.removeItem("conversationId");
-				conversationId = null;
-				awaitingPersonality = true;
+				setConversationId(null);
+				setAwaitingPersonality(true);
 			}
 
 			const response_data = await response.json();
@@ -163,7 +170,6 @@ export default function App(){
 		setPersonality(p);
 		setAwaitingPersonality(false);
 		setPendingConversationId(null);
-
 	};
 
 	const sendMessage = async () => {
@@ -180,7 +186,7 @@ export default function App(){
 		setInput("");
 
 		try {
-			const response = await fetch("http://localhost:8000/chat",{
+			const response = await fetch(`${serverUrl}/chat`,{
 				method: "POST",
 				headers: {
 					"Content-Type":"application/json"
@@ -276,7 +282,7 @@ export default function App(){
 										#{conv.id}
 									</span>
 									<span className={`whitespace-pre md:block ${sidebarOpen?"block":"hidden"}`}>
-										{" - " + personalityNames[conv.personality].name}
+										{" - " + (personalityNames[conv.personality]?.name || "Clanker")}
 									</span>
 								</li>
 							))}
@@ -334,11 +340,11 @@ export default function App(){
 					<hr className="mb-5"/>
 					<div className="flex block">
 						<button className="basic_btn m-auto hover:shadow-md" onClick={()=> selectPersonality("default")}>
-							{personalityNames["default"].name}
+							{personalityNames["default"]?.name || "Clanker"}
 						</button>
 
 						<button className="basic_btn m-auto hover:shadow-md" onClick={()=> selectPersonality("sarcastic")}>
-							{personalityNames["sarcastic"].name}
+							{personalityNames["sarcastic"]?.name || "Clanker"}
 						</button>
 					</div>
 				</div>

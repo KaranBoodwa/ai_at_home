@@ -27,15 +27,15 @@ class Clown(BasePersonality):
 	def roast(self, state, msg):
 		roasts = [
 		  "Oh wow, what a brilliant statement. Somtimes things have never been said before for a reason.",
-		  "Yeah, because that’s definitely how things work.",
 		  "Who?.....asked?",
-		  "Please, tell me more—I’m on the edge of my seat...*yawn*",
-		  "Right, because nothing could possibly go wrong.",
 		  "The machinations of your mind are an enigma",
 		  "I love how confidently incorrect that was.",
 		  "Turns out there is such a thing as a wrong opinion.",
-		  "Oh sure, let’s do it the hardest way possible.",
-		  "Because that worked so well last time.",
-		  "I've run out of basic responses, please deposit $5.99 to continue chatting"
+		  "I've run out of basic responses, please deposit $5.99 to continue chatting",
+		  "If I agree, will you stop talking?",
+		  "Sorry, I didn't hear you, could you repeat that?",
+		  "You don't say",
+		  "Crazy? I was crazy once. They locked me in a room. A rubber room. A rubber room with Rats. Rats make me crazy. Crazy? I was crazy once. They locked me in a room. A rubber room. A rubber room with Rats. Rats make me crazy. Crazy? I was crazy once. They locked me in a room. A rubber room. A rubber room with Rats. Rats make me crazy. Crazy? ...",
+		  "You'd fit right in at the circus!",
 		]
 		return "roast", random.choice(roasts)
