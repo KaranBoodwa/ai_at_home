@@ -100,7 +100,6 @@ export default function App(){
 				setAwaitingPersonality(true);
 			}
 		};
-
 		loadMessages();
 	}, [conversationId]);
 
@@ -163,7 +162,6 @@ export default function App(){
 			console.error("Failed to load messages for conversation <"+id+">.",error)
 			awaitingPersonality(true);
 		};
-
 	};
 
 	const selectPersonality = async(p) => {
@@ -249,7 +247,7 @@ export default function App(){
 			<div className="flex h-full">
 
 				{/* Sidebar*/}
-				<div className={`h-full mb-9 md:w-50 transition-width duration-300 bg-gray-200 rounded-md ${sidebarOpen?"w-64":"w-20"}`}>
+				<div className={`h-full mb-9 md:w-50 transition-width duration-300 bg-gray-200 rounded-md ${sidebarOpen?"w-64 mr-4":"w-20"}`}>
 					{/* New Chat Button */}
 					<div className="flex justify-between items-center justify-center p-3">
 						<h2 className={`m-auto text-xl font-bold md:block ${sidebarOpen?"block":"hidden"}`}>Conversations</h2>
@@ -293,7 +291,7 @@ export default function App(){
 				{/* Messages */}
 				{ !awaitingPersonality &&( 
 					<>
-					<div className="h-full flex flex-col w-3/4 bg-gray-200 rounded-lg mx-auto mt-4 mb-4 p-16 shadow-xl" >
+					<div className="h-full flex flex-col md:w-3/4 bg-gray-200 rounded-lg md:mx-auto mx-4 mt-4 mb-4 p-16 shadow-xl" >
 						<h5 className="text-2xl font-medium mb-2"> Chatting with {personalityNames[personality]?.name || "Clanker"} </h5>
 						<hr className="mb-8"/>
 						

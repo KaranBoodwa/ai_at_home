@@ -1,0 +1,1 @@
+# Book ingester - processes all pdfs / txts / docs in specified books path, chunks, embeds, and indexes them

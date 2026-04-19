@@ -10,7 +10,7 @@ function About(){
 				<h1 className="text-2xl font-medium mb-2">
 					About
 				</h1>
-				<h2 className="font-medium text-sm text-indigo-400 mb-4 tracking-wide">
+				<h2 className="text-sm text-indigo-400 mb-4 tracking-wide font-bold">
 					What's the backstory?
 				</h2>
 					This is a creative writing exercise masquerading as a coding side project.
