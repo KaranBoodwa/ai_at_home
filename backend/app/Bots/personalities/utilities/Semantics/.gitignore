@@ -1,0 +1,4 @@
+# Ignore the specific subfiles when pushing to github, keep the folder structure
+Books/*
+Index/*
+Models/*

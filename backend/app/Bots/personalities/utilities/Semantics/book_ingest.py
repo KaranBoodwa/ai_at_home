@@ -14,15 +14,19 @@ import re
 import json
 import os
 import sys
+from nltk.tokenize import PunktTokenizer
 
+# Only used for testing 
+import random
+import transformers
 
 # Config vars
 BOOK_DIR = ".\\Books"
 INDEX_DIR = ".\\Index"
 EXTENSIONS = {".txt", ".pdf", ".docx"}
-QUOTE_LENGTH = 250 # Refers to size in chars of a good book quote roughly
 MODEL = ".\\Models\\all-mpnet-base-v2" # Quality > speed
-MODEL_DIM = 768
+MODEL_DIM = 768 # Here for reference and checks, unused
+BATCH_SIZE = 32 # Embedding batch size
 INDEX_FILE = "faiss.index"
 CHUNK_FILE = "chunks.jsonl"
 META_FILE  = "meta.json" # I'm So Meta Even This Acronym
@@ -36,16 +40,23 @@ def checkout(folder):
 	if not os.path.isdir(folder):
 		raise OSError(f"Given directory: [{folder}] not found.")
 
-	books = []
+	# Fetch list of books already read
+	reading_log = {}
+	reading_log_path = os.path.join(INDEX_DIR,META_FILE)
+	if os.path.isfile(reading_log_path):
+		with open(reading_log_path, 'r', encoding='utf-8') as log:
+			reading_log = json.load(log)
 
-	# For each file in the given directory, add it to list of books if extension is acceptable
+	books = []
+	# For each file in the given directory, add it to list of books if extension is acceptable and not already read
 	for file in os.listdir(folder):
 		file_path = os.path.join(folder, file)
-		if os.path.isfile(file_path):
+		if os.path.isfile(file_path) and file not in reading_log:
 			extension = "." + file.split(".")[-1]
 			if extension in EXTENSIONS:
 				books.append(file_path)
 
+	print(books)
 	return books
 
 
@@ -71,134 +82,165 @@ def read_book(book_path):
 	return contents
 
 
-# Turns contents into ~250 character chunks, aiming for ~4 sentences roughly
+# Turns contents 5 sentence chunks with 1 sentence overlaps
 # Goal is to generate chunks that stand alone as decent sized quotations of a text
-def chunkate(contents):
-	# Splits contents into separate sentences by looking for clause ending punctuation
-	sentences = [(re.sub(r'[\s+]',' ',x)) for x in (re.split(r'[.!?;]+',contents))]
+def chunkate(contents, quote_length=5, overlap=1):
+	# Splits contents into separate sentences by utilizing nltk
+	sent_tokenizer = PunktTokenizer()
+	sentences = sent_tokenizer.tokenize(contents.strip())
 	chunks = []
 
 	i = 0
 	while i < len(sentences):
-		chunk_sentences = ""
-		num_sentences = 0
-		while len(chunk_sentences) < QUOTE_LENGTH and i+num_sentences < len(sentences):
-			chunk_sentences = chunk_sentences + sentences[i+num_sentences].strip()
-			num_sentences += 1
+		chunks.append(" ".join(sentences[i:i+quote_length]))
+		i += quote_length - overlap
 
-		chunks.append(chunk_sentences)
-
-		i = i + num_sentences
-		# Allow overlaps of 1 sentence if current chunk is larger than just 1 sentence
-		if num_sentences > 1:
-			i -=1
-
+	
 	return chunks
 
 
 # Manual chunking mode, chunks a given text into chunks separated by a given separator
-def manual_chunk(book_path, separator):
-	contents = ""
-	with open(book_path, 'r', encoding='utf-8') as book:
-		contents = book.read()
-	
-	chunks = re.split(rf'{separator}',contents)
-
-	for chunk in chunks[:5]:
-		print(f"{chunk}")
-
+def manual_chunk(contents, separator):
+	# Don't include any empty chunks
+	chunks = [c for c in re.split(rf'{separator}',contents) if c.strip()]
 	return chunks
 
 
-def embed(chunks):
-	model = SentenceTransformer(MODEL)
-	vectors = model.encode(chunks, show_progress_bar=True)
+def embed(chunks,progress_bar=True, batch_size=BATCH_SIZE):
+	model=SentenceTransformer(MODEL)
+	vectors = model.encode(chunks, batch_size=batch_size, show_progress_bar=progress_bar)
 	return np.array(vectors).astype("float32")
 
+def embed_query(question):
+	model=SentenceTransformer(MODEL)
+	vector = model.encode_query(question, show_progress_bar=False)
+	return np.array(vector).astype("float32")
 
-def add_index(vectors):
-	index_path = os.path.join(INDEX_DIR,INDEX_FILE)
+def create_index(vectors):
 	dim = vectors.shape[1]
-	print(dim)
-	index = faiss.IndexFlatL2(dim)
-
-	index.add(vectors)
-	faiss.write_index(index, index_path)
-
+	idx = faiss.IndexFlatL2(dim)
+	idx.add(vectors)
+	return idx
 
 # Go study
-# Main entrypoint for the ingestion pipeline
+# Ingestion pipleline as described at top of file
 def study(folder):
-	try:
-		books = checkout(folder)
-		chunks = []
-		chunks_plus_meta = []
-		chunk_counter = 0 # Used to generate chunk id metadata
+	if not os.path.isdir(folder):
+		raise OSError(f"Given directory: [{folder}] not found.")
 
-		print(books)
-		for book in books:
-			book_title = book.split("\\")[-1]
-			print(f"reading book: {book_title}")
-			contents = read_book(book)
+	# Gather list of books to chunk and embed
+	books = checkout(folder)
 
-			print(f"chunking book: {book_title}")
-			# book_chunks = chunkate(contents)
+	# End pipeline early if nothing new to add
+	if not books:
+		print("No new files found")
+		return
 
-			# Manual chunk mode for specially prepared files
-			book_chunks = manual_chunk(contents,"##")
+	# If index already exists, load it
+	# For other vars, they will be used to append to existing records if they exist in retain()
+	idx = load_index()
+	chunks = []
+	meta = {}
 
-			# Currently I double store chunks into 2 lists, one with metadata, and one designed to be piped to embed()
-			# Need a better solution to avoid double storage
-			for chunk in book_chunks:
-				chunk_json = {"file_name":book_title, "chunk_id": chunk_counter, "text":chunk}
-				chunk_counter += 1
-				chunks_plus_meta.append(chunk_json)
-				chunks.append(chunk)
+	for book in books:
+		book_title = book.split("\\")[-1]
+		print(f"reading book: {book_title}")
+		contents = read_book(book)
 
-			print(f"{book_title} split into {len(book_chunks)} chunks")
+		print(f"chunking book: {book_title}")
+		book_chunks = chunkate(contents)
+		# book_chunks = manual_chunk(contents,"##")
 
-			
-		vectors = embed(chunks)
-		add_index(vectors)
+		print(f"{book_title} split into {len(book_chunks)} chunks")
 
-		# Persistence --------------------------------------
-		# Ensure index dir exists before writing to it
-		if not os.path.isdir(INDEX_DIR):
-			os.mkdir(INDEX_DIR)
+		# Embed the book chunks and add to vector store
+		book_vectors = embed(book_chunks)
+		if idx is None:
+			idx = create_index(book_vectors)
+		else:
+			idx.add(book_vectors)
 
-		# Dump chunks to chunks.jsonl
-		print("dumping chunks...")
-		with open(os.path.join(INDEX_DIR,CHUNK_FILE),'w') as file:
-			for chunk in total_chunks:
-				file.write(json.dumps(chunk)+'\n')
+		# Generate info for chunks and meta
+		meta[book_title] = {
+			"title":"",
+			"author":"",
+			"number_of_chunks":len(book_chunks)
+		}
+		for book_chunk in book_chunks:
+			chunks.append({"file_name":book_title,"text":book_chunk})
 
-		print("dumping meta...")
-		# Dump metadata to meta.json
-		with open(os.path.join(INDEX_DIR,META_FILE), 'w') as file:
-			books_json = {}
-			for book in books:
-				book_title = book.split("\\")[-1]
-				books_json[book_title]={"title":"","author":""}
-			file.write(json.dumps(books_json,indent=4))
 
-	except OSError as e:
-		print(e)
+	retain(idx,chunks,meta)
+
+
+
+# Retain all the information consumed so it can be remembered later
+# AKA write index, chunks, and metadata to files to be loaded
+def retain(idx, chunks, meta):
+	index_path = os.path.join(INDEX_DIR,INDEX_FILE)
+	chunks_path = os.path.join(INDEX_DIR,CHUNK_FILE)
+	meta_path = os.path.join(INDEX_DIR,META_FILE)
+
+	# Ensure index dir exists before writing to it
+	if not os.path.isdir(INDEX_DIR):
+		os.mkdir(INDEX_DIR)
+
+	# Dump index to faiss.index
+	print("dumping index...")
+	faiss.write_index(idx, index_path)
+
+	# Dump chunks to chunks.jsonl
+	# Loads existing chunks to avoid any empty lines & ensure lineup for embedding vectors
+	print("dumping chunks...")
+	chunk_log = load_chunks()
+	if not chunk_log:
+		chunk_log = chunks
+	else:
+		chunk_log = chunk_log + chunks
+	with open(chunks_path,'w') as file:
+		for chunk in chunk_log:
+			file.write(json.dumps(chunk)+'\n')
+
+	# Dump metadata to meta.json
+	print("dumping meta...")
+	meta_log = load_meta()
+	if meta_log:
+		meta.update(meta_log)
+	with open(meta_path, 'w') as file:
+		file.write(json.dumps(meta,indent=4))
 
 
 def load_index():
-	index_path = os.path.join(INDEX_DIR,INDEX_FILE)
+	idx_path = os.path.join(INDEX_DIR,INDEX_FILE)
+	if not os.path.isfile(idx_path):
+		return None
+	idx = faiss.read_index(idx_path)
+	return idx
+
+def load_chunks():
 	chunks_path = os.path.join(INDEX_DIR,CHUNK_FILE)
-	index = faiss.read_index(index_path)
+	if not os.path.isfile(chunks_path):
+		return None
 	chunks = []
 	with open(chunks_path, 'r') as file:
 		for line in file:
 			chunks.append(json.loads(line))
+	return chunks
 
-	return index, chunks
+def load_meta():
+	meta_path = os.path.join(INDEX_DIR,META_FILE)
+	if not os.path.isfile(meta_path):
+		return None
+	meta = None
+	with open(meta_path, 'r') as file:
+		meta = json.load(file)
+	return meta
+
 
 # Sample query method to test embeddings
 def query(index, chunks, q, k=5):
-	q_vec = embed([q])
+	q_vec = embed_query([q])
+
 	dist, idx = index.search(q_vec, k)
 	results = []
 	for i in idx[0]:
@@ -208,23 +250,24 @@ def query(index, chunks, q, k=5):
 
 # To do: add optional argument to just regenerate embeddings, without re-chunking
 # Also: skip files with file names in meta.json
-if __name__=="__main__":	
+if __name__=="__main__":
 	# Optional argument specifying directory to ingest
 	if len(sys.argv) > 1:
 		BOOK_DIR = sys.argv[1]
 
-	# books = checkout(BOOK_DIR)
-	# print(books)
-	# study(BOOK_DIR)
+	study(BOOK_DIR)
 
 
-	# Sample test
-	# index, chunks = load_index()
+	# =========Testing=========
+	idx = load_index()
+	chunks = load_chunks()
 
-	# results = query(index,chunks, "What is love?")
-	# print("What is love? Shakespeare says: \n")
-	# for result in results:
-	# 	print(result)
+	while(True):
+		question = input("Ask Away:")
+		if question == "q":
+			break
+		results = query(idx, chunks, question)
+		print("Results:")
+		result = random.choice(results)
+		print(f"File:{result['file_name']}\nExcerpt: {result["text"].strip()}")
 
-
-	# manual_chunk(".\\Books\\shakespeare_sonnets.txt","##")

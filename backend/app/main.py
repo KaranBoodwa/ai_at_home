@@ -23,3 +23,9 @@ app.add_middleware(
 @app.get("/")
 def root():
 	return {"message": "API is running"}
+
+
+# In powershell with backend as root:
+# uvicorn app.main:app --reload
+# In powershell with frontend as root:
+# npm run dev
